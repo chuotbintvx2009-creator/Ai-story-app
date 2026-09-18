@@ -13,17 +13,17 @@ if api_input:
     st.session_state.api_key = api_input
     genai.configure(api_key=api_input)
 
-# 2. Ô System Instructions giống AI Studio
+# 2. Ô System Instructions giống AI Studio - Cơ chế CHO PHÉP tự do sáng tác
 st.sidebar.header("⚙️ Cấu hình hệ thống")
 system_instruction = st.sidebar.text_area(
     "2. System Instructions (Ghim phong cách, bối cảnh):",
-    value="Bạn là một nhà văn giả tưởng đại tài, viết theo phong cách Dark Fantasy (giả tưởng đen tối). Hãy kể chuyện cuốn hút, miêu tả chân thực và khốc liệt các trận chiến, nỗi đau thể xác, và không khí u ám. Các cảnh thân mật người lớn cần miêu tả sâu sắc, nghệ thuật, tập trung vào nội tâm nhân vật. Luôn tuân thủ logic các phần trước.",
+    value="Bạn là một nhà văn giả tưởng đại tài. Hãy kể chuyện cuốn hút và phát triển tình tiết tự nhiên theo nội dung người dùng nhập vào. Bạn ĐƯỢC PHÉP miêu tả chân thực, khốc liệt các trận chiến (bao gồm cả các chi tiết máu me, thương tích) hoặc các cảnh lãng mạn thân mật người lớn NẾU diễn biến và cốt truyện của người dùng yêu cầu, nhưng không cần phải tự ý nhồi nhét nếu tình huống đang diễn ra bình thường. Luôn tuân thủ tuyệt đối logic của các phần trước.",
     height=200
 )
 
 # 3. Khởi tạo danh sách lưu trữ cốt truyện (Cơ chế đệm trượt)
 if "story_segments" not in st.session_state:
-    st.session_state.story_segments = ["TÓM TẮT DIỄN BIẾN TRUYỆN ĐÃ QUA:\n- Câu chuyện bắt đầu."]
+    st.session_state.story_segments = ["TÓM TẤT DIỄN BIẾN TRUYỆN ĐÃ QUA:\n- Câu chuyện bắt đầu."]
 
 if "messages" not in st.session_state: 
     st.session_state.messages = []
@@ -56,7 +56,7 @@ st.sidebar.info(all_current_lore[:2000] + ("..." if len(all_current_lore) > 2000
 
 # Nút Xóa hẳn toàn bộ cốt truyện về số 0
 if st.sidebar.button("⚠️ Xóa Sạch Toàn Bộ Cốt Truyện"):
-    st.session_state.story_segments = ["TÓM TẮT DIỄN BIẾN TRUYỆN ĐÃ QUA:\n- Câu chuyện bắt đầu."]
+    st.session_state.story_segments = ["TÓM TẤT DIỄN BIẾN TRUYỆN ĐÃ QUA:\n- Câu chuyện bắt đầu."]
     st.session_state.messages = []
     st.toast("Đã xóa sạch bộ nhớ về số 0!", icon="🧠")
     st.rerun()
@@ -93,7 +93,7 @@ if user_input := st.chat_input("Nhập diễn biến tiếp theo của câu chuy
             with st.spinner("AI đang viết tiếp truyện..."):
                 model = genai.GenerativeModel('gemini-2.5-pro') 
                 
-                # CẤU HÌNH HẠ BỘ LỌC AN TOÀN TOÀN DIỆN CHO TRUYỆN DARK FANTASY/18+
+                # CẤU HÌNH HẠ BỘ LỌC AN TOÀN TOÀN DIỆN CHO TRUYỆN 
                 safety_settings = [
                     {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
                     {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -108,21 +108,26 @@ if user_input := st.chat_input("Nhập diễn biến tiếp theo của câu chuy
                     )
                     ai_response = response.text
                 except Exception as e:
-                    ai_response = "⚠️ Câu chuyện chạm phải bộ lọc an toàn nghiêm trọng nhất của hệ thống hoặc lỗi API. Vui lòng giảm bớt từ ngữ quá trần trụi hoặc đổi hướng cốt truyện ẩn dụ hơn một chút."
+                    # Nếu Google chặn phản hồi, AI sẽ im lặng bỏ qua lỗi hoặc hiển thị trống thay vì ngắt dòng thông báo cũ
+                    ai_response = ""
 
-                st.markdown(ai_response)
+                if ai_response:
+                    st.markdown(ai_response)
+                else:
+                    st.warning("Lượt chat này không tạo được nội dung, hãy thử diễn đạt lại bằng từ ngữ ẩn dụ hơn một chút nhé.")
                 
-        st.session_state.messages.append({"role": "assistant", "content": ai_response})
+        if ai_response:
+            st.session_state.messages.append({"role": "assistant", "content": ai_response})
 
-        # 5. THUẬT TOÁN ĐỆM TRƯỢT: Thêm phần mới, nếu vượt 700k từ thì xóa phần xa nhất
-        new_segment = f"[Diễn biến]: {user_input} -> {ai_response}"
-        st.session_state.story_segments.append(new_segment)
-        
-        # Vòng lặp kiểm tra: Cứ vượt quá 700.000 từ là tự động xóa phần tử đầu tiên (xa nhất)
-        while count_words(st.session_state.story_segments) > 700000:
-            if len(st.session_state.story_segments) > 1:
-                st.session_state.story_segments.pop(1) # Giữ lại dòng tiêu đề ở vị trí 0, xóa phần cũ nhất ở vị trí 1
-            else:
-                break
+            # 5. THUẬT TOÁN ĐỆM TRƯỢT: Thêm phần mới, nếu vượt 700k từ thì xóa phần xa nhất
+            new_segment = f"[Tình tiết]: {user_input} -> {ai_response}"
+            st.session_state.story_segments.append(new_segment)
+            
+            # Vòng lặp kiểm tra: Cứ vượt quá 700.000 từ là tự động xóa phần tử đầu tiên (xa nhất)
+            while count_words(st.session_state.story_segments) > 700000:
+                if len(st.session_state.story_segments) > 1:
+                    st.session_state.story_segments.pop(1) # Xóa phần cũ nhất ở vị trí 1
+                else:
+                    break
                 
         st.rerun()
